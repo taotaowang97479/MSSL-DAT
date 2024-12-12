@@ -19,14 +19,17 @@ class ReverseLayerF(Function):
 
 
 class CNR2d(nn.Module):
-    def __init__(self, ch_in, ch_out, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)):
+    def __init__(self, ch_in, ch_out, kernel_size=(1, 1), stride=(1, 1), padding=(0, 0), use_relu=True):
         super().__init__()
-        self.conv = nn.Conv2d(ch_in, ch_out, kernel_size=kernel_size, stride=stride, padding=padding)
-        self.bn = nn.BatchNorm2d(ch_out)
-        self.relu = nn.ReLU(inplace=True)
+        self.conv = nn.Sequential(
+            nn.Conv2d(ch_in, ch_out, kernel_size=kernel_size, stride=stride, padding=padding, bias=False),
+            nn.BatchNorm2d(ch_out))
+
+        if use_relu:
+            self.conv.append(nn.ReLU(inplace=True))
 
     def forward(self, x):
-        x = self.relu(self.bn(self.conv(x)))
+        x = self.conv(x)
 
         return x
 
@@ -36,13 +39,13 @@ class ResidualBlock(nn.Module):
         super(ResidualBlock, self).__init__()
         self.pw1 = CNR2d(dim, dim, kernel_size=1)
         self.dw = CNR2d(dim, dim, kernel_size=3, padding=1)
-        self.pw2 = CNR2d(dim, dim, kernel_size=1)
+        self.pw2 = CNR2d(dim, dim, kernel_size=1, use_relu=False)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         inp = x.clone()
-        x = self.relu(self.pw1(x))
-        x = self.relu(self.dw(x))
+        x = self.pw1(x)
+        x = self.dw(x)
         x = self.pw2(x)
 
         return self.relu(x + inp)
