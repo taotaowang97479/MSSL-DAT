@@ -91,7 +91,7 @@ class DOA_Estimator(nn.Module):
 class Domain_Classifier(nn.Module):
     def __init__(self):
         super(Domain_Classifier, self).__init__()
-        self.ResidualBlock = ResidualBlock(128)
+        self.residual_block = ResidualBlock(128)
         self.conv1 = CNR2d(128, 16, kernel_size=3, stride=(2, 3))
         self.conv2 = CNR2d(16, 2, kernel_size=3, stride=(2, 3))
         self.fc = nn.Linear(12, 1)
@@ -99,7 +99,7 @@ class Domain_Classifier(nn.Module):
 
     def forward(self, x):
         # x:[2, 128, 7, 54]
-        x = self.ResidualBlock(x)
+        x = self.residual_block(x)
         x = self.conv1(x)
         x = self.conv2(x)
         x = x.view(x.shape[0], -1)
