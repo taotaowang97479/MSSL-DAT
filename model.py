@@ -37,15 +37,15 @@ class ResidualBlock(nn.Module):
         self.pw1 = CNR2d(dim, dim, kernel_size=1)
         self.dw = CNR2d(dim, dim, kernel_size=3, padding=1)
         self.pw2 = CNR2d(dim, dim, kernel_size=1)
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         inp = x.clone()
-        x = self.pw1(x)
-        x = self.dw(x)
+        x = self.relu(self.pw1(x))
+        x = self.relu(self.dw(x))
         x = self.pw2(x)
-        x = x + inp  # 可能x还要经过relu(原始残差是要经过relu的)
 
-        return x
+        return self.relu(x + inp)
 
 
 class Feature_Encoder(nn.Module):
@@ -53,14 +53,12 @@ class Feature_Encoder(nn.Module):
         super(Feature_Encoder, self).__init__()
         self.conv1 = CNR2d(8, 32, kernel_size=(1, 7), stride=(1, 3))
         self.conv2 = CNR2d(32, 128, kernel_size=(1, 5), stride=(1, 2))
-        self.ResidualBlock1 = ResidualBlock(128)
-        self.ResidualBlock2 = ResidualBlock(128)
+        self.residual_blocks = nn.Sequential(ResidualBlock(128), ResidualBlock(128))
 
     def forward(self, x):
         x = self.conv1(x)
         x = self.conv2(x)  # [2, 128, 7, 54]
-        x = self.ResidualBlock1(x)
-        x = self.ResidualBlock2(x)
+        x = self.residual_blocks(x)
 
         return x
 
@@ -68,9 +66,7 @@ class Feature_Encoder(nn.Module):
 class DOA_Estimator(nn.Module):
     def __init__(self):
         super(DOA_Estimator, self).__init__()
-        self.ResidualBlock1 = ResidualBlock(128)
-        self.ResidualBlock2 = ResidualBlock(128)
-        self.ResidualBlock3 = ResidualBlock(128)
+        self.residual_blocks = nn.Sequential(ResidualBlock(128), ResidualBlock(128), ResidualBlock(128))
         self.pw1 = CNR2d(128, 360, kernel_size=1)
         self.pw2 = CNR2d(54, 500, kernel_size=1)
         self.conv = CNR2d(500, 1, kernel_size=(7, 5), padding=(0, 2))
@@ -78,9 +74,7 @@ class DOA_Estimator(nn.Module):
 
     def forward(self, x):
         # x:[2, 128, 7, 54]
-        x = self.ResidualBlock1(x)
-        x = self.ResidualBlock2(x)
-        x = self.ResidualBlock3(x)
+        x = self.residual_blocks(x)
         x = self.pw1(x)
         # swap axes  C<--->F
         x = x.permute(0, 3, 2, 1)  # [2, 54, 7, 360]
@@ -112,9 +106,9 @@ class Domain_Classifier(nn.Module):
         return x
 
 
-class ResidualNet(nn.Module):
+class ResNet(nn.Module):
     def __init__(self):
-        super(ResidualNet, self).__init__()
+        super(ResNet, self).__init__()
         self.feature_encoder = Feature_Encoder()
         self.doa_estimator = DOA_Estimator()
         self.domain_classifier = Domain_Classifier()
@@ -130,6 +124,6 @@ class ResidualNet(nn.Module):
 
 if __name__ == '__main__':
     x = torch.rand(2, 8, 7, 337)  # [B, C, T, F]
-    model = ResidualNet()
+    model = ResNet()
     estimate_output, domain_output = model(x, alpha=0.1)
     print("estimate_output:", estimate_output.size(), "domain_output:", domain_output.size())
